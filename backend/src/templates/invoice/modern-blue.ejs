@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Modern Blue Invoice</title>
+    <style>
+        :root {
+            --primary: #3b82f6;
+            --primary-dark: #1d4ed8;
+            --secondary: #64748b;
+            --text-main: #1e293b;
+            --text-light: #64748b;
+            --border: #e2e8f0;
+            --bg-light: #f8fafc;
+        }
+        body {
+            font-family: 'Inter', system-ui, -apple-system, sans-serif;
+            margin: 0;
+            padding: 40px;
+            color: var(--text-main);
+            background: #fff;
+            line-height: 1.5;
+        }
+        .invoice-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 40px;
+            border-bottom: 2px solid var(--primary);
+            padding-bottom: 20px;
+        }
+        .business-info h1 {
+            margin: 0;
+            color: var(--primary);
+            font-size: 28px;
+            font-weight: 800;
+        }
+        .business-info p {
+            margin: 4px 0;
+            color: var(--text-light);
+            font-size: 14px;
+        }
+        .invoice-meta {
+            text-align: right;
+        }
+        .invoice-meta h2 {
+            margin: 0;
+            color: var(--text-main);
+            font-size: 32px;
+            font-weight: 900;
+            text-transform: uppercase;
+        }
+        .invoice-meta p {
+            margin: 4px 0;
+            font-weight: 600;
+        }
+        .customer-section {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 30px;
+        }
+        .section-title {
+            text-transform: uppercase;
+            font-size: 12px;
+            font-weight: 800;
+            color: var(--primary);
+            margin-bottom: 8px;
+            letter-spacing: 0.05em;
+        }
+        .customer-info p, .payment-info p {
+            margin: 2px 0;
+            font-size: 14px;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+        th {
+            background-color: var(--bg-light);
+            color: var(--text-main);
+            font-weight: 700;
+            text-align: left;
+            padding: 12px;
+            border-bottom: 2px solid var(--border);
+            font-size: 13px;
+            text-transform: uppercase;
+        }
+        td {
+            padding: 12px;
+            border-bottom: 1px solid var(--border);
+            font-size: 14px;
+        }
+        .item-row:nth-child(even) {
+            background-color: #fafbfc;
+        }
+        .col-qty, .col-rate, .col-amount {
+            text-align: right;
+        }
+        .totals-section {
+            margin-top: 30px;
+            display: flex;
+            justify-content: flex-end;
+        }
+        .totals-table {
+            width: 300px;
+        }
+        .totals-table td {
+            padding: 8px 12px;
+            border: none;
+        }
+        .total-row {
+            background-color: var(--primary);
+            color: #fff;
+            font-weight: 800;
+            font-size: 18px !important;
+        }
+        .total-row td {
+            padding: 15px 12px;
+        }
+        .footer {
+            margin-top: 50px;
+            border-top: 1px solid var(--border);
+            padding-top: 20px;
+            font-size: 12px;
+            color: var(--text-light);
+            display: flex;
+            justify-content: space-between;
+        }
+        .qr-section {
+            text-align: right;
+        }
+    </style>
+</head>
+<body>
+    <div class="invoice-header">
+        <div class="business-info">
+            <h1><%= business.name %></h1>
+            <p><%= business.address %></p>
+            <p>GSTIN: <%= business.gst %></p>
+            <p>Phone: <%= business.phone %></p>
+        </div>
+        <div class="invoice-meta">
+            <h2>Invoice</h2>
+            <p>#<%= bill.number %></p>
+            <p>Date: <%= bill.date %></p>
+        </div>
+    </div>
+
+    <div class="customer-section">
+        <div class="customer-info">
+            <div class="section-title">Bill To</div>
+            <p><strong><%= bill.customerName %></strong></p>
+            <p><%= bill.customerAddress %></p>
+            <p>Phone: <%= bill.customerPhone %></p>
+            <% if (bill.customerGst) { %>
+                <p>GSTIN: <%= bill.customerGst %></p>
+            <% } %>
+        </div>
+        <div class="payment-info">
+            <div class="section-title">Payment Info</div>
+            <p>Mode: <%= bill.paymentMode %></p>
+            <p>Status: <%= bill.paymentStatus %></p>
+        </div>
+    </div>
+
+    <table>
+        <thead>
+            <tr>
+                <th>Sr.</th>
+                <th>Item Description</th>
+                <th class="col-qty">Qty</th>
+                <th class="col-rate">Rate</th>
+                <th class="col-amount">Amount</th>
+            </tr>
+        </thead>
+        <tbody>
+            <% bill.items.forEach((item, index) => { %>
+                <tr class="item-row">
+                    <td><%= index + 1 %></td>
+                    <td><strong><%= item.name %></strong></td>
+                    <td class="col-qty"><%= item.qty %></td>
+                    <td class="col-rate">₹<%= item.rate.toFixed(2) %></td>
+                    <td class="col-amount">₹<%= item.total.toFixed(2) %></td>
+                </tr>
+            <% }); %>
+        </tbody>
+    </table>
+
+    <div class="totals-section">
+        <table class="totals-table">
+            <tr>
+                <td>Subtotal</td>
+                <td style="text-align: right;">₹<%= bill.subtotal.toFixed(2) %></td>
+            </tr>
+            <tr>
+                <td>Tax (<%= bill.taxRate %>%)</td>
+                <td style="text-align: right;">₹<%= bill.taxAmount.toFixed(2) %></td>
+            </tr>
+            <% if (bill.discount > 0) { %>
+            <tr>
+                <td>Discount</td>
+                <td style="text-align: right;">-₹<%= bill.discount.toFixed(2) %></td>
+            </tr>
+            <% } %>
+            <tr class="total-row">
+                <td>Grand Total</td>
+                <td style="text-align: right;">₹<%= bill.totalAmount.toFixed(2) %></td>
+            </tr>
+        </table>
+    </div>
+
+    <div class="footer">
+        <div class="terms">
+            <p><strong>Terms & Conditions:</strong></p>
+            <p>1. Goods once sold will not be taken back.</p>
+            <p>2. Payment should be made within 7 days.</p>
+        </div>
+        <div class="qr-section">
+            <p>Scan to Pay</p>
+            <div style="width: 80px; height: 80px; background: #eee; margin-left: auto; display: flex; align-items: center; justify-content: center; font-size: 10px;">QR CODE</div>
+        </div>
+    </div>
+</body>
+</html>

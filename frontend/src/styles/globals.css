@@ -1,0 +1,289 @@
+@import "tailwindcss/base";
+@import "tailwindcss/components";
+@import "tailwindcss/utilities";
+
+@layer base {
+  :root {
+    --background: 220 20% 97%;
+    --foreground: 220 30% 10%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 220 30% 10%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 220 30% 10%;
+
+    --primary: 217 71% 45%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 220 14% 92%;
+    --secondary-foreground: 220 30% 20%;
+
+    --muted: 220 14% 95%;
+    --muted-foreground: 220 10% 46%;
+
+    --accent: 38 92% 50%;
+    --accent-foreground: 0 0% 100%;
+
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 220 13% 88%;
+    --input: 220 13% 88%;
+    --ring: 217 71% 45%;
+
+    --radius: 0.625rem;
+
+    --success: 152 56% 42%;
+    --success-foreground: 0 0% 100%;
+
+    --warning: 38 92% 50%;
+    --warning-foreground: 0 0% 100%;
+
+    --invoice-product: 217 71% 45%;
+    --invoice-inventory: 152 56% 42%;
+    --invoice-taxation: 38 92% 50%;
+
+    --sidebar-background: 0 0% 100%;
+    --sidebar-foreground: 220 30% 10%;
+    --sidebar-primary: 217 71% 45%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 220 14% 95%;
+    --sidebar-accent-foreground: 220 30% 10%;
+    --sidebar-border: 220 13% 88%;
+    --sidebar-ring: 217 71% 45%;
+    
+    --primary-color: #3b82f6;
+  }
+
+  .dark {
+    --background: 220 30% 8%;
+    --foreground: 220 10% 92%;
+    --card: 220 25% 12%;
+    --card-foreground: 220 10% 92%;
+    --popover: 220 25% 12%;
+    --popover-foreground: 220 10% 92%;
+    --primary: 217 71% 55%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 220 20% 18%;
+    --secondary-foreground: 220 10% 85%;
+    --muted: 220 20% 16%;
+    --muted-foreground: 220 10% 55%;
+    --accent: 38 92% 55%;
+    --accent-foreground: 0 0% 100%;
+    --destructive: 0 62% 30%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 220 20% 20%;
+    --input: 220 20% 20%;
+    --ring: 217 71% 55%;
+  }
+}
+
+@layer base {
+  * {
+    border-color: hsl(var(--border) / 1);
+  }
+}
+
+:root {
+  --primary-color: #3b82f6; /* Default Blue Base */
+}
+
+/* Force update ALL Primary Buttons */
+.MuiButton-containedPrimary, 
+button.primary, 
+.btn-primary {
+  background-color: var(--primary-color) !important;
+  border-color: var(--primary-color) !important;
+  color: white !important;
+  transition: background-color 0.3s ease;
+}
+
+/* Accent Focus for Icons (Handled dynamically) */
+.active-sidebar-item {
+  color: var(--primary-color) !important;
+}
+
+/* Icons follow variable, Text remains neutral */
+.MuiListItemIcon-root, 
+.MuiTypography-colorPrimary, 
+.active-icon {
+  color: var(--primary-color) !important;
+}
+
+body {
+    margin: 0;
+    font-family: Arial, sans-serif;
+}
+
+/* ── Remove Recharts chart focus/click border globally ── */
+.recharts-wrapper,
+.recharts-wrapper svg,
+.recharts-wrapper:focus,
+.recharts-wrapper svg:focus,
+.recharts-surface,
+.recharts-surface:focus {
+    outline: none !important;
+    border: none !important;
+    -webkit-tap-highlight-color: transparent !important;
+}
+
+/* Also catch any focused state on the SVG */
+svg:focus {
+    outline: none !important;
+}
+
+h1,h2,h3,h4,h5,h6 {
+    margin: 0;
+    padding: 0;
+}
+
+a {
+    text-decoration: none;
+    color: #007bff;
+}
+
+a:hover {
+    text-decoration: underline;
+}
+
+.container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 20px;
+}
+
+.header {
+    background: var(--primary-color);
+    color: white;
+    padding: 10px 20px;
+}
+
+.sidebar {
+    background: #343a40;
+    color: white;
+    padding: 15px;
+}
+
+.main-content {
+    padding: 20px;
+    background: white;
+    border-radius: 5px;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+}
+
+.button {
+    background: var(--primary-color);
+    color: white;
+    border: none;
+    padding: 10px 15px;
+    border-radius: 5px;
+    cursor: pointer;
+}
+
+.button:hover {
+    background: #0056b3;
+}
+
+.table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 20px 0;
+}
+
+.table th,
+.table td {
+    border: 1px solid #ddd;
+    padding: 8px;
+}
+
+.table th {
+    background: #f2f2f2;
+}
+
+.input {
+    width: 100%;
+    padding: 10px;
+    margin: 5px 0 15px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+}
+
+.error {
+    color: red;
+    font-size: 0.9em;
+}
+
+/* Logo Upload Component Styles */
+.logo-preview {
+    width: 100px;
+    height: 100px;
+    object-fit: contain;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    margin-top: 10px;
+    background-color: #f9f9f9;
+}
+
+@media print {
+    @page {
+        size: A4;
+        margin: 10mm;
+    }
+
+    body {
+        margin: 0 !important;
+        padding: 0 !important;
+        background: #fff !important;
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
+    }
+
+    /* Hide ALL UI elements */
+    .MuiAppBar-root,
+    .MuiDrawer-root,
+    header,
+    nav,
+    aside,
+    .sidebar,
+    .MuiDrawer-paper,
+    .MuiButton-root,
+    .MuiIconButton-root,
+    .MuiChip-root,
+    .MuiDialogTitle-root,
+    .MuiDialogActions-root,
+    .no-print {
+        display: none !important;
+    }
+
+    /* Ensure the main container doesn't have background and padding that breaks layout */
+    body > #root, 
+    main,
+    .MuiBox-root {
+        background: transparent !important;
+        box-shadow: none !important;
+        margin: 0 !important;
+        padding: 0 !important;
+    }
+
+    #printable-invoice {
+        display: block !important;
+        width: 210mm !important;
+        height: 297mm !important;
+        /* Force exact A4 height */
+        max-height: 297mm !important;
+        margin: 0 auto !important;
+        background: white !important;
+        border: none !important;
+        overflow: hidden !important;
+        /* Prevent spill to page 2 */
+        position: relative !important;
+    }
+}
+
+/* Global Layout Fixes */
+#root {
+    margin: 0 !important;
+    padding: 0 !important;
+    min-height: 100vh;
+}

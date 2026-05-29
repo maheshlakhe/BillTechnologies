@@ -1,0 +1,1205 @@
+/* eslint-disable */
+import React, { useState, useEffect, useMemo } from 'react';
+import {
+  Box,
+  Typography,
+  Grid,
+  Card,
+  CardContent,
+  Button,
+  TextField,
+  IconButton,
+  Chip,
+  Tabs,
+  Tab,
+  Paper,
+  Divider,
+  Stack,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  FormControl,
+  InputLabel,
+  Select,
+  MenuItem,
+  InputAdornment,
+  CircularProgress,
+  Badge,
+  alpha,
+  useTheme
+} from '@mui/material';
+import {
+  Search as SearchIcon,
+  Restaurant as RestaurantIcon,
+  LocalCafe as DrinkIcon,
+  ShoppingCart as CartIcon,
+  Print as PrintIcon,
+  Delete as DeleteIcon,
+  Add as AddIcon,
+  Remove as RemoveIcon,
+  TableBar as TableIcon,
+  Receipt as ReceiptIcon,
+  QrCode as QrCodeIcon,
+  Close as CloseIcon,
+  Person as PersonIcon,
+  Send as SendIcon,
+  Money as CashIcon,
+  CreditCard as CardIconPay,
+  DinnerDining as FoodIcon
+} from '@mui/icons-material';
+import { useBills } from '../../hooks/useBills';
+import { useProducts } from '../../hooks/useProducts';
+import { useCustomers } from '../../hooks/useCustomers';
+import { useNotification } from '../../contexts/NotificationContext';
+import { processSaleData } from '../../utils/billingUtils';
+import RealRestaurantThermal from '../../modules/billing-templates/RealRestaurantThermal';
+
+interface RestaurantPOSViewProps {
+  onClose: () => void;
+  initialBill?: any;
+}
+
+interface CartItem {
+  productId: string;
+  name: string;
+  price: number;
+  quantity: number;
+  taxRate: number;
+  remarks?: string;
+  category?: string;
+  emoji?: string;
+}
+
+interface TableState {
+  id: string;
+  name: string;
+  section: 'AC' | 'Garden' | 'Hall' | 'Family';
+  status: 'available' | 'occupied' | 'selected';
+  cart: CartItem[];
+  kot: CartItem[];
+}
+
+export const RestaurantPOSView: React.FC<RestaurantPOSViewProps> = ({ onClose, initialBill }) => {
+  const theme = useTheme();
+  const { createBill, updateBill } = useBills();
+  const { products, loading: productsLoading } = useProducts();
+  const { customers } = useCustomers();
+  const { showSuccess, showError, showWarning } = useNotification();
+
+  // Selected customer for the bill
+  const [selectedCustomer, setSelectedCustomer] = useState<any>(null);
+
+  // Set default customer
+  useEffect(() => {
+    if (customers && customers.length > 0) {
+      // Find default walk-in or general customer, or pick the first one
+      const def = customers.find(c => c.name.toLowerCase().includes('walk-in') || c.name.toLowerCase().includes('general')) || customers[0];
+      setSelectedCustomer(def);
+    }
+  }, [customers]);
+
+  // Table Management State
+  const [tables, setTables] = useState<TableState[]>([
+    // AC Section
+    { id: 'AC-1', name: 'AC 1', section: 'AC', status: 'available', cart: [], kot: [] },
+    { id: 'AC-2', name: 'AC 2', section: 'AC', status: 'available', cart: [], kot: [] },
+    { id: 'AC-3', name: 'AC 3', section: 'AC', status: 'available', cart: [], kot: [] },
+    { id: 'AC-4', name: 'AC 4', section: 'AC', status: 'available', cart: [], kot: [] },
+    { id: 'AC-5', name: 'AC 5', section: 'AC', status: 'available', cart: [], kot: [] },
+    { id: 'AC-6', name: 'AC 6', section: 'AC', status: 'available', cart: [], kot: [] },
+    // Garden Section
+    { id: 'G-1', name: 'G 1', section: 'Garden', status: 'available', cart: [], kot: [] },
+    { id: 'G-2', name: 'G 2', section: 'Garden', status: 'available', cart: [], kot: [] },
+    { id: 'G-3', name: 'G 3', section: 'Garden', status: 'available', cart: [], kot: [] },
+    { id: 'G-4', name: 'G 4', section: 'Garden', status: 'available', cart: [], kot: [] },
+    // Hall Section
+    { id: 'H-1', name: 'H 1', section: 'Hall', status: 'available', cart: [], kot: [] },
+    { id: 'H-2', name: 'H 2', section: 'Hall', status: 'available', cart: [], kot: [] },
+    { id: 'H-3', name: 'H 3', section: 'Hall', status: 'available', cart: [], kot: [] },
+    { id: 'H-4', name: 'H 4', section: 'Hall', status: 'available', cart: [], kot: [] },
+    { id: 'H-5', name: 'H 5', section: 'Hall', status: 'available', cart: [], kot: [] },
+    { id: 'H-6', name: 'H 6', section: 'Hall', status: 'available', cart: [], kot: [] },
+    // Family Section
+    { id: 'F-1', name: 'F 1', section: 'Family', status: 'available', cart: [], kot: [] },
+    { id: 'F-2', name: 'F 2', section: 'Family', status: 'available', cart: [], kot: [] },
+    { id: 'F-3', name: 'F 3', section: 'Family', status: 'available', cart: [], kot: [] },
+    { id: 'F-4', name: 'F 4', section: 'Family', status: 'available', cart: [], kot: [] },
+  ]);
+
+  const [activeTableId, setActiveTableId] = useState<string>('AC-1');
+  const [activeSectionTab, setActiveSectionTab] = useState<string>('AC');
+
+  const activeTable = useMemo(() => {
+    return tables.find(t => t.id === activeTableId) || tables[0];
+  }, [tables, activeTableId]);
+
+  // Product Category & Search States
+  const [menuTab, setMenuTab] = useState<string>('all');
+  const [searchQuery, setSearchQuery] = useState<string>('');
+
+  // Cart-specific options
+  const [taxRate, setTaxRate] = useState<number>(5); // 5% GST standard for restaurants
+  const [discountType, setDiscountType] = useState<'percent' | 'amount'>('percent');
+  const [discountValue, setDiscountValue] = useState<number>(0);
+  const [paymentMode, setPaymentMode] = useState<string>('UPI');
+
+  // Dialog State
+  const [billReceiptOpen, setBillReceiptOpen] = useState(false);
+  const [generatedBillData, setGeneratedBillData] = useState<any>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Preloaded Restaurant Menu Items (used if user has no products)
+  const defaultRestaurantItems = useMemo(() => [
+    { id: 'd1', name: 'Paneer Tikka', price: 280, taxRate: 5, category: 'Starters', emoji: '🍢' },
+    { id: 'd2', name: 'Chicken Tikka', price: 340, taxRate: 5, category: 'Starters', emoji: '🍗' },
+    { id: 'd3', name: 'Veg Biryani', price: 220, taxRate: 5, category: 'Main Course', emoji: '🍛' },
+    { id: 'd4', name: 'Butter Chicken', price: 380, taxRate: 5, category: 'Main Course', emoji: '🍛' },
+    { id: 'd5', name: 'Dal Tadka', price: 160, taxRate: 5, category: 'Main Course', emoji: '🥣' },
+    { id: 'd6', name: 'Garlic Naan', price: 60, taxRate: 5, category: 'Breads', emoji: '🫓' },
+    { id: 'd7', name: 'Masala Papad', price: 40, taxRate: 5, category: 'Starters', emoji: '🫓' },
+    { id: 'd8', name: 'French Fries', price: 120, taxRate: 5, category: 'Starters', emoji: '🍟' },
+    { id: 'd9', name: 'Virgin Mojito', price: 110, taxRate: 5, category: 'Beverages', emoji: '🍹' },
+    { id: 'd10', name: 'Iced Tea', price: 90, taxRate: 5, category: 'Beverages', emoji: '🥤' },
+    { id: 'd11', name: 'Blenders Pride', price: 210, taxRate: 5, category: 'Liquor', emoji: '🥃' },
+    { id: 'd12', name: 'Kingfisher', price: 180, taxRate: 5, category: 'Liquor', emoji: '🍺' },
+    { id: 'd13', name: 'Hot Fudge Sundae', price: 150, taxRate: 5, category: 'Desserts', emoji: '🍨' },
+    { id: 'd14', name: 'Sizzling Brownie', price: 180, taxRate: 5, category: 'Desserts', emoji: '🍰' },
+  ], []);
+
+  // Map user products or fallback to preloaded items
+  const menuItems = useMemo(() => {
+    if (products && products.length > 0) {
+      return products.map(p => {
+        // Guess category or assign to Main Course
+        let cat = p.category || 'Main Course';
+        if (p.name.toLowerCase().includes('beer') || p.name.toLowerCase().includes('drink') || p.name.toLowerCase().includes('whisky') || p.name.toLowerCase().includes('monk') || p.name.toLowerCase().includes('kingfisher') || p.name.toLowerCase().includes('pride')) {
+          cat = 'Liquor';
+        } else if (p.name.toLowerCase().includes('mojito') || p.name.toLowerCase().includes('tea') || p.name.toLowerCase().includes('juice') || p.name.toLowerCase().includes('water') || p.name.toLowerCase().includes('coke')) {
+          cat = 'Beverages';
+        } else if (p.name.toLowerCase().includes('papad') || p.name.toLowerCase().includes('tikka') || p.name.toLowerCase().includes('fries') || p.name.toLowerCase().includes('wings') || p.name.toLowerCase().includes('chilli')) {
+          cat = 'Starters';
+        } else if (p.name.toLowerCase().includes('ice') || p.name.toLowerCase().includes('brownie') || p.name.toLowerCase().includes('cake') || p.name.toLowerCase().includes('jamun') || p.name.toLowerCase().includes('halwa')) {
+          cat = 'Desserts';
+        } else if (p.name.toLowerCase().includes('naan') || p.name.toLowerCase().includes('roti') || p.name.toLowerCase().includes('paratha')) {
+          cat = 'Breads';
+        }
+
+        // Assign emojis for delightful UI
+        let emoji = '🍛';
+        if (cat === 'Beverages') emoji = '🍹';
+        else if (cat === 'Liquor') emoji = '🥃';
+        else if (cat === 'Desserts') emoji = '🍨';
+        else if (cat === 'Starters') emoji = '🍢';
+        else if (cat === 'Breads') emoji = '🫓';
+
+        return {
+          id: p.id,
+          name: p.name,
+          price: p.price,
+          taxRate: p.taxRate || 5,
+          category: cat,
+          emoji: emoji
+        };
+      });
+    }
+    return defaultRestaurantItems;
+  }, [products, defaultRestaurantItems]);
+
+  // Unique categories list
+  const categories = useMemo(() => {
+    const cats = new Set(menuItems.map(item => item.category));
+    return ['all', ...Array.from(cats)];
+  }, [menuItems]);
+
+  // Filter menu items by search query & category tab
+  const filteredMenuItems = useMemo(() => {
+    return menuItems.filter(item => {
+      const matchesSearch = item.name.toLowerCase().includes(searchQuery.toLowerCase());
+      const matchesCategory = menuTab === 'all' || item.category === menuTab;
+      return matchesSearch && matchesCategory;
+    });
+  }, [menuItems, searchQuery, menuTab]);
+
+  // Table status and selection
+  const handleSelectTable = (tableId: string) => {
+    setActiveTableId(tableId);
+  };
+
+  // Add Item to active table's cart
+  const handleAddToOrder = (item: typeof menuItems[0]) => {
+    setTables(prev => prev.map(t => {
+      if (t.id !== activeTableId) return t;
+
+      const existingIndex = t.cart.findIndex(c => c.productId === item.id);
+      let updatedCart = [...t.cart];
+
+      if (existingIndex > -1) {
+        updatedCart[existingIndex] = {
+          ...updatedCart[existingIndex],
+          quantity: updatedCart[existingIndex].quantity + 1
+        };
+      } else {
+        updatedCart.push({
+          productId: item.id,
+          name: item.name,
+          price: item.price,
+          quantity: 1,
+          taxRate: item.taxRate,
+          emoji: item.emoji,
+          category: item.category
+        });
+      }
+
+      return {
+        ...t,
+        status: t.kot.length > 0 || updatedCart.length > 0 ? 'occupied' : 'available',
+        cart: updatedCart
+      };
+    }));
+  };
+
+  // Adjust item quantity in active table's cart
+  const handleAdjustQuantity = (productId: string, amount: number) => {
+    setTables(prev => prev.map(t => {
+      if (t.id !== activeTableId) return t;
+
+      const updatedCart = t.cart.map(item => {
+        if (item.productId === productId) {
+          const newQty = item.quantity + amount;
+          return newQty > 0 ? { ...item, quantity: newQty } : null;
+        }
+        return item;
+      }).filter(Boolean) as CartItem[];
+
+      return {
+        ...t,
+        cart: updatedCart,
+        status: t.kot.length > 0 || updatedCart.length > 0 ? 'occupied' : 'available'
+      };
+    }));
+  };
+
+  // Remove Item completely from active table's cart
+  const handleRemoveFromCart = (productId: string) => {
+    setTables(prev => prev.map(t => {
+      if (t.id !== activeTableId) return t;
+
+      const updatedCart = t.cart.filter(item => item.productId !== productId);
+      return {
+        ...t,
+        cart: updatedCart,
+        status: t.kot.length > 0 || updatedCart.length > 0 ? 'occupied' : 'available'
+      };
+    }));
+  };
+
+  // Add order remarks (spicy, less oil, etc.)
+  const handleUpdateRemarks = (productId: string, remarks: string) => {
+    setTables(prev => prev.map(t => {
+      if (t.id !== activeTableId) return t;
+      const updatedCart = t.cart.map(item => 
+        item.productId === productId ? { ...item, remarks } : item
+      );
+      return { ...t, cart: updatedCart };
+    }));
+  };
+
+  // Send Items to Kitchen (Generate Kitchen Order Ticket - KOT)
+  const handleSendToKitchen = () => {
+    if (activeTable.cart.length === 0) {
+      showWarning('Cart is empty. Add items to send KOT.');
+      return;
+    }
+
+    setTables(prev => prev.map(t => {
+      if (t.id !== activeTableId) return t;
+
+      // Merge current cart items into KOT list
+      const mergedKot = [...t.kot];
+      t.cart.forEach(cartItem => {
+        const existingIdx = mergedKot.findIndex(k => k.productId === cartItem.productId);
+        if (existingIdx > -1) {
+          mergedKot[existingIdx] = {
+            ...mergedKot[existingIdx],
+            quantity: mergedKot[existingIdx].quantity + cartItem.quantity
+          };
+        } else {
+          mergedKot.push({ ...cartItem });
+        }
+      });
+
+      return {
+        ...t,
+        kot: mergedKot,
+        cart: [], // Clear temporary cart
+        status: 'occupied'
+      };
+    }));
+
+    showSuccess(`KOT Sent for ${activeTable.name} successfully!`);
+  };
+
+  // Total Calculations
+  const calculations = useMemo(() => {
+    // We calculate based on both KOT and temporary cart items
+    const allItems = [...activeTable.kot];
+    
+    // Add cart items (if any, merge them for billing)
+    activeTable.cart.forEach(cartItem => {
+      const idx = allItems.findIndex(i => i.productId === cartItem.productId);
+      if (idx > -1) {
+        allItems[idx] = {
+          ...allItems[idx],
+          quantity: allItems[idx].quantity + cartItem.quantity
+        };
+      } else {
+        allItems.push({ ...cartItem });
+      }
+    });
+
+    const subtotal = allItems.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+    const taxAmount = (subtotal * taxRate) / 100;
+    
+    let discountAmount = 0;
+    if (discountType === 'percent') {
+      discountAmount = (subtotal * discountValue) / 100;
+    } else {
+      discountAmount = discountValue;
+    }
+
+    const grandTotal = Math.max(0, subtotal + taxAmount - discountAmount);
+
+    return {
+      allItems,
+      subtotal,
+      taxAmount,
+      discountAmount,
+      grandTotal
+    };
+  }, [activeTable, taxRate, discountType, discountValue]);
+
+  // Complete Payment & Save Bill to Database
+  const handleGenerateBill = async () => {
+    const { allItems, grandTotal, subtotal, taxAmount, discountAmount } = calculations;
+
+    if (allItems.length === 0) {
+      showError('Please add items or send KOT to generate bill.');
+      return;
+    }
+
+    if (!selectedCustomer) {
+      showError('Please select a customer for the bill.');
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      // 1. Prepare items payload for DB
+      const itemsPayload = allItems.map(item => ({
+        productId: item.productId.startsWith('d') ? null : item.productId, // Null if default mock item
+        productName: item.name,
+        quantity: item.quantity,
+        price: item.price,
+        total: item.price * item.quantity,
+        taxRate: item.taxRate,
+        customFields: {
+          remarks: item.remarks || '',
+          category: item.category || 'Main Course',
+          table_no: activeTable.name
+        }
+      }));
+
+      // 2. Prepare overall bill payload
+      const billPayload = {
+        customerId: selectedCustomer.id,
+        customerName: selectedCustomer.name,
+        customerEmail: selectedCustomer.email || null,
+        items: itemsPayload,
+        status: 'PAID',
+        paymentStatus: 'PAID',
+        dueDate: new Date().toISOString().split('T')[0],
+        paymentMode: paymentMode,
+        templateId: 'thermal_restaurant', // Dedicated thermal print template
+        branchId: localStorage.getItem('currentBranchId') || null,
+        customFields: {
+          table_no: activeTable.name,
+          discount_amount: discountAmount,
+          tax_amount: taxAmount,
+          subtotal: subtotal
+        }
+      };
+
+      console.log('[POS POS] Generating Bill payload:', billPayload);
+      const result = await createBill(billPayload as any);
+
+      // Store generated data for preview
+      setGeneratedBillData({
+        ...result,
+        saleData: {
+          items: allItems.map(i => ({
+            name: i.name,
+            qty: i.quantity,
+            rate: i.price,
+            total: i.price * i.quantity,
+            taxRate: i.taxRate,
+            remarks: i.remarks || ''
+          })),
+          tableNo: activeTable.name,
+          storeName: localStorage.getItem('billsoft_store_name') || 'ACME RESTAURANT & BAR',
+          storeAddress: 'Hinjewadi Phase 1, Pune',
+          storeGSTIN: '27AADCB2342G1Z2',
+          billNo: (result as any)?.billNumber || 'KOT-' + Math.floor(Math.random() * 1000),
+          billDate: new Date().toLocaleDateString(),
+          customerName: selectedCustomer.name,
+          customerPhone: selectedCustomer.phone || 'Walk-in',
+          discountAmount: discountAmount,
+          taxAmount: taxAmount,
+          grandTotal: grandTotal,
+          paymentMode: paymentMode
+        }
+      });
+
+      // Clear Table states
+      setTables(prev => prev.map(t => {
+        if (t.id !== activeTableId) return t;
+        return {
+          ...t,
+          cart: [],
+          kot: [],
+          status: 'available'
+        };
+      }));
+
+      // Reset cart states
+      setDiscountValue(0);
+      showSuccess(`Bill generated successfully for ${activeTable.name}!`);
+      setBillReceiptOpen(true);
+
+      // Dispatch refresh events
+      window.dispatchEvent(new Event('bill-created'));
+      window.dispatchEvent(new Event('bills-updated'));
+
+    } catch (err: any) {
+      console.error('[POS POS Error] Submission failed:', err);
+      showError(err.response?.data?.error || err.message || 'Failed to generate restaurant bill.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  // Reset Table Cart/Order completely
+  const handleCancelOrder = () => {
+    if (window.confirm(`Are you sure you want to cancel the order for ${activeTable.name}? This will clear all items and KOT.`)) {
+      setTables(prev => prev.map(t => {
+        if (t.id !== activeTableId) return t;
+        return {
+          ...t,
+          cart: [],
+          kot: [],
+          status: 'available'
+        };
+      }));
+      setDiscountValue(0);
+      showWarning(`Order cancelled for ${activeTable.name}.`);
+    }
+  };
+
+  // Pre-configured Section Filter
+  const activeTablesList = useMemo(() => {
+    return tables.filter(t => t.section === activeSectionTab);
+  }, [tables, activeSectionTab]);
+
+  return (
+    <Box sx={{
+      display: 'flex',
+      flexDirection: 'column',
+      height: '100vh',
+      width: '100%',
+      bgcolor: '#121214', // Dark mode background to wow user
+      color: '#fff',
+      position: 'fixed',
+      top: 0,
+      left: 0,
+      zIndex: 1300,
+      overflow: 'hidden'
+    }}>
+      {/* 1. Header Bar */}
+      <Box sx={{
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        px: 3,
+        py: 1.5,
+        bgcolor: '#1a1a1e',
+        borderBottom: '1px solid #2a2a30'
+      }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+          <Box sx={{
+            width: 40,
+            height: 40,
+            borderRadius: '50%',
+            bgcolor: 'rgba(255, 71, 87, 0.1)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            border: '1px solid rgba(255, 71, 87, 0.3)'
+          }}>
+            <RestaurantIcon sx={{ color: '#ff4757', fontSize: 22 }} />
+          </Box>
+          <Box>
+            <Typography variant="h6" sx={{ fontWeight: 800, fontFamily: 'Outfit, sans-serif', letterSpacing: '-0.3px', color: '#fff', lineHeight: 1.2 }}>
+              AstroPOS Elite
+            </Typography>
+            <Typography variant="caption" sx={{ color: '#8a8a93', fontWeight: 600 }}>
+              Counter: MAIN-01 • v2.4.0 • Active Server
+            </Typography>
+          </Box>
+        </Box>
+
+        <Stack direction="row" spacing={2} alignItems="center">
+          <Chip
+            avatar={<PersonIcon sx={{ color: '#ff4757 !important' }} />}
+            label={selectedCustomer ? selectedCustomer.name : 'Walk-in Customer'}
+            onClick={() => {}}
+            sx={{
+              bgcolor: 'rgba(255, 255, 255, 0.05)',
+              color: '#fff',
+              border: '1px solid rgba(255, 255, 255, 0.1)',
+              fontWeight: 'bold',
+              '& .MuiChip-avatar': { bgcolor: 'rgba(255, 71, 87, 0.1)' }
+            }}
+          />
+
+          <IconButton 
+            onClick={onClose} 
+            sx={{
+              bgcolor: 'rgba(255, 255, 255, 0.05)',
+              color: '#8a8a93',
+              '&:hover': { bgcolor: 'rgba(255, 71, 87, 0.2)', color: '#ff4757' }
+            }}
+          >
+            <CloseIcon />
+          </IconButton>
+        </Stack>
+      </Box>
+
+      {/* 2. Main Dashboard Split Layout */}
+      <Box sx={{ display: 'flex', flexGrow: 1, overflow: 'hidden' }}>
+        
+        {/* Left Side: Table & Menu Area */}
+        <Box sx={{ display: 'flex', flexDirection: 'column', flex: 7, borderRight: '1px solid #2a2a30', overflow: 'hidden' }}>
+          
+          {/* Table Selector Segment */}
+          <Box sx={{ p: 2.5, bgcolor: '#16161a', borderBottom: '1px solid #2a2a30' }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
+              <Typography variant="subtitle1" sx={{ fontWeight: 800, color: '#ff4757', display: 'flex', alignItems: 'center', gap: 1 }}>
+                <TableIcon /> Table Management
+              </Typography>
+              <Tabs
+                value={activeSectionTab}
+                onChange={(_, val) => setActiveSectionTab(val)}
+                textColor="inherit"
+                indicatorColor="primary"
+                sx={{
+                  minHeight: 35,
+                  '& .MuiTabs-indicator': { bgcolor: '#ff4757', height: 3 },
+                  '& .MuiTab-root': {
+                    color: '#8a8a93',
+                    minHeight: 35,
+                    py: 0.5,
+                    px: 2,
+                    fontWeight: 700,
+                    fontSize: '0.85rem',
+                    textTransform: 'none',
+                    borderRadius: 1.5,
+                    mr: 1,
+                    '&.Mui-selected': { color: '#fff', bgcolor: 'rgba(255, 71, 87, 0.08)' }
+                  }
+                }}
+              >
+                <Tab label="AC Section" value="AC" />
+                <Tab label="Garden View" value="Garden" />
+                <Tab label="Main Hall" value="Hall" />
+                <Tab label="Family Room" value="Family" />
+              </Tabs>
+            </Box>
+
+            {/* Tables Grid */}
+            <Box sx={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fill, minmax(105px, 1fr))',
+              gap: 1.5
+            }}>
+              {activeTablesList.map((t) => {
+                const isSelected = t.id === activeTableId;
+                const isOccupied = t.kot.length > 0 || t.cart.length > 0;
+                
+                return (
+                  <Button
+                    key={t.id}
+                    onClick={() => handleSelectTable(t.id)}
+                    sx={{
+                      minHeight: 70,
+                      display: 'flex',
+                      flexDirection: 'column',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      borderRadius: 3,
+                      border: '2px solid',
+                      borderColor: isSelected 
+                        ? '#ff4757' 
+                        : isOccupied 
+                          ? 'rgba(255, 165, 2, 0.3)' 
+                          : 'rgba(255, 255, 255, 0.05)',
+                      bgcolor: isSelected 
+                        ? 'rgba(255, 71, 87, 0.15)' 
+                        : isOccupied 
+                          ? 'rgba(255, 165, 2, 0.05)' 
+                          : '#1e1e24',
+                      color: isSelected 
+                        ? '#fff' 
+                        : isOccupied 
+                          ? '#ffa502' 
+                          : '#8a8a93',
+                      transition: 'all 0.2s ease',
+                      '&:hover': {
+                        transform: 'translateY(-2px)',
+                        boxShadow: '0 4px 12px rgba(255, 71, 87, 0.15)',
+                        borderColor: '#ff4757'
+                      }
+                    }}
+                  >
+                    <TableIcon sx={{ fontSize: 20, mb: 0.5 }} />
+                    <Typography sx={{ fontWeight: 800, fontSize: '0.85rem' }}>{t.name}</Typography>
+                    {isOccupied && (
+                      <Typography sx={{ fontSize: '0.62rem', fontWeight: 'bold', color: '#ffa502', opacity: 0.8 }}>
+                        {t.kot.length > 0 ? `${t.kot.length} KOT` : 'Ordering'}
+                      </Typography>
+                    )}
+                  </Button>
+                );
+              })}
+            </Box>
+          </Box>
+
+          {/* Menu Search & Category Filter Area */}
+          <Box sx={{ p: 2.5, display: 'flex', flexDirection: 'column', flexGrow: 1, overflow: 'hidden' }}>
+            
+            {/* Search & Tabs Row */}
+            <Box sx={{ display: 'flex', gap: 2, mb: 2.5, alignItems: 'center' }}>
+              <TextField
+                placeholder="Search food, beverages, desserts..."
+                size="small"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                InputProps={{
+                  startAdornment: <SearchIcon sx={{ color: '#8a8a93', mr: 1 }} />,
+                  sx: {
+                    bgcolor: '#1e1e24',
+                    border: '1px solid #2a2a30',
+                    color: '#fff',
+                    borderRadius: 2.5,
+                    '& input': { py: 1 }
+                  }
+                }}
+                sx={{ width: 280 }}
+              />
+
+              {/* Category Filters */}
+              <Box sx={{ display: 'flex', gap: 1, overflowX: 'auto', flexGrow: 1, pb: 0.5 }}>
+                {categories.map((cat) => (
+                  <Chip
+                    key={cat}
+                    label={cat === 'all' ? 'All Items' : cat}
+                    onClick={() => setMenuTab(cat)}
+                    sx={{
+                      bgcolor: menuTab === cat ? '#ff4757' : '#1e1e24',
+                      color: '#fff',
+                      fontWeight: 700,
+                      cursor: 'pointer',
+                      borderRadius: 2,
+                      border: '1px solid',
+                      borderColor: menuTab === cat ? '#ff4757' : 'rgba(255,255,255,0.05)',
+                      '&:hover': { bgcolor: menuTab === cat ? '#ff4757' : 'rgba(255, 255, 255, 0.08)' }
+                    }}
+                  />
+                ))}
+              </Box>
+            </Box>
+
+            {/* Menu Items Grid */}
+            <Box sx={{ flexGrow: 1, overflowY: 'auto', pr: 1 }}>
+              {productsLoading ? (
+                <Box sx={{ display: 'flex', justifyContent: 'center', py: 8 }}>
+                  <CircularProgress color="error" />
+                </Box>
+              ) : filteredMenuItems.length > 0 ? (
+                <Grid container spacing={2}>
+                  {filteredMenuItems.map((item) => (
+                    <Grid size={{ xs: 6, sm: 4, md: 3 }} key={item.id}>
+                      <Card
+                        onClick={() => handleAddToOrder(item)}
+                        sx={{
+                          bgcolor: '#1e1e24',
+                          border: '1px solid rgba(255,255,255,0.03)',
+                          borderRadius: 4,
+                          cursor: 'pointer',
+                          position: 'relative',
+                          transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
+                          '&:hover': {
+                            transform: 'translateY(-4px)',
+                            boxShadow: '0 8px 24px rgba(255, 71, 87, 0.12)',
+                            borderColor: 'rgba(255, 71, 87, 0.4)',
+                            '& .menu-add-badge': { bgcolor: '#ff4757', transform: 'scale(1.1)' }
+                          }
+                        }}
+                      >
+                        <CardContent sx={{ p: 2, textAlign: 'center' }}>
+                          <Box sx={{
+                            fontSize: '2.5rem',
+                            mb: 1.5,
+                            width: 60,
+                            height: 60,
+                            borderRadius: '50%',
+                            bgcolor: 'rgba(255,255,255,0.03)',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            mx: 'auto'
+                          }}>
+                            {item.emoji}
+                          </Box>
+                          
+                          <Typography variant="body1" noWrap sx={{ fontWeight: 800, mb: 0.5, color: '#fff', fontSize: '0.9rem', lineHeight: 1.3, height: 35, overflow: 'hidden' }}>
+                            {item.name}
+                          </Typography>
+                          
+                          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mt: 1.5 }}>
+                            <Typography sx={{ fontWeight: 800, color: '#ff4757', fontSize: '1rem' }}>
+                              ₹{item.price}
+                            </Typography>
+                            <Box
+                              className="menu-add-badge"
+                              sx={{
+                                width: 26,
+                                height: 26,
+                                borderRadius: '50%',
+                                bgcolor: 'rgba(255, 255, 255, 0.05)',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                transition: 'all 0.2s ease',
+                                border: '1px solid rgba(255,255,255,0.1)'
+                              }}
+                            >
+                              <AddIcon sx={{ fontSize: 16, color: '#fff' }} />
+                            </Box>
+                          </Box>
+                        </CardContent>
+                      </Card>
+                    </Grid>
+                  ))}
+                </Grid>
+              ) : (
+                <Box sx={{ textAlign: 'center', py: 8 }}>
+                  <Typography color="text.secondary">No items match your filters.</Typography>
+                </Box>
+              )}
+            </Box>
+          </Box>
+        </Box>
+
+        {/* Right Side: Active Cart & Billing Sidebar */}
+        <Box sx={{ display: 'flex', flexDirection: 'column', flex: 3, bgcolor: '#16161a', overflow: 'hidden' }}>
+          
+          {/* Table Header Details */}
+          <Box sx={{ p: 2.5, borderBottom: '1px solid #2a2a30', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+              <Box sx={{
+                width: 38,
+                height: 38,
+                borderRadius: 2,
+                bgcolor: 'rgba(255, 165, 2, 0.1)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                border: '1px solid rgba(255, 165, 2, 0.2)'
+              }}>
+                <TableIcon sx={{ color: '#ffa502' }} />
+              </Box>
+              <Box>
+                <Typography sx={{ fontWeight: 800, color: '#fff', fontSize: '1rem' }}>
+                  Current Order
+                </Typography>
+                <Typography variant="caption" sx={{ color: '#ffa502', fontWeight: 'bold' }}>
+                  Selected Table: {activeTable.name} ({activeTable.section})
+                </Typography>
+              </Box>
+            </Box>
+            
+            {activeTable.kot.length > 0 && (
+              <Badge badgeContent={activeTable.kot.length} color="error">
+                <Chip label="KOT Active" size="small" color="warning" sx={{ height: 20, fontSize: '0.65rem', fontWeight: 800 }} />
+              </Badge>
+            )}
+          </Box>
+
+          {/* Cart & KOT Items Scroll Container */}
+          <Box sx={{ flexGrow: 1, overflowY: 'auto', p: 2 }}>
+            
+            {/* 1. KOT Items (Printed and sent to Kitchen) */}
+            {activeTable.kot.length > 0 && (
+              <Box sx={{ mb: 3 }}>
+                <Typography variant="caption" sx={{ color: '#8a8a93', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.5px', display: 'block', mb: 1.5 }}>
+                  Kitchen Order Tickets (KOT)
+                </Typography>
+                
+                {activeTable.kot.map((item) => (
+                  <Box key={item.productId} sx={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    py: 1,
+                    px: 1.5,
+                    borderRadius: 2,
+                    mb: 1,
+                    bgcolor: 'rgba(255, 165, 2, 0.03)',
+                    border: '1px solid rgba(255, 165, 2, 0.1)'
+                  }}>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.2 }}>
+                      <Typography sx={{ color: '#ffa502', fontSize: '0.9rem', fontWeight: 'bold' }}>
+                        {item.quantity}x
+                      </Typography>
+                      <Box>
+                        <Typography sx={{ color: '#fff', fontWeight: 700, fontSize: '0.85rem' }}>
+                          {item.name}
+                        </Typography>
+                        {item.remarks && (
+                          <Typography sx={{ fontSize: '0.7rem', color: '#ff4757', fontWeight: 600 }}>
+                            * {item.remarks}
+                          </Typography>
+                        )}
+                      </Box>
+                    </Box>
+                    <Typography sx={{ color: '#8a8a93', fontSize: '0.85rem', fontWeight: 'bold' }}>
+                      ₹{item.price * item.quantity}
+                    </Typography>
+                  </Box>
+                ))}
+              </Box>
+            )}
+
+            {/* 2. Current Cart Items (New items not yet sent to Kitchen) */}
+            <Typography variant="caption" sx={{ color: '#8a8a93', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.5px', display: 'block', mb: 1.5 }}>
+              New Items to KOT
+            </Typography>
+
+            {activeTable.cart.length > 0 ? (
+              activeTable.cart.map((item) => (
+                <Box key={item.productId} sx={{
+                  display: 'flex',
+                  flexDirection: 'column',
+                  p: 1.5,
+                  borderRadius: 3,
+                  bgcolor: '#1e1e24',
+                  mb: 1.5,
+                  border: '1px solid rgba(255,255,255,0.03)'
+                }}>
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 1 }}>
+                    <Box>
+                      <Typography sx={{ color: '#fff', fontWeight: 800, fontSize: '0.88rem' }}>
+                        {item.name}
+                      </Typography>
+                      <Typography variant="caption" sx={{ color: '#8a8a93' }}>
+                        ₹{item.price} each
+                      </Typography>
+                    </Box>
+                    
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                      <IconButton
+                        size="small"
+                        onClick={() => handleAdjustQuantity(item.productId, -1)}
+                        sx={{ bgcolor: 'rgba(255,255,255,0.05)', color: '#fff', p: 0.5 }}
+                      >
+                        <RemoveIcon sx={{ fontSize: 14 }} />
+                      </IconButton>
+                      <Typography sx={{ color: '#fff', fontWeight: 800, fontSize: '0.9rem', minWidth: 20, textAlign: 'center' }}>
+                        {item.quantity}
+                      </Typography>
+                      <IconButton
+                        size="small"
+                        onClick={() => handleAdjustQuantity(item.productId, 1)}
+                        sx={{ bgcolor: 'rgba(255,255,255,0.05)', color: '#fff', p: 0.5 }}
+                      >
+                        <AddIcon sx={{ fontSize: 14 }} />
+                      </IconButton>
+                    </Box>
+                  </Box>
+
+                  {/* Remarks & Delete row */}
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 1 }}>
+                    <TextField
+                      placeholder="Remarks (e.g. Less Spicy)"
+                      size="small"
+                      value={item.remarks || ''}
+                      onChange={(e) => handleUpdateRemarks(item.productId, e.target.value)}
+                      variant="standard"
+                      InputProps={{
+                        disableUnderline: true,
+                        sx: { color: '#ff4757', fontSize: '0.75rem', fontWeight: 600 }
+                      }}
+                      sx={{ flexGrow: 1 }}
+                    />
+                    
+                    <IconButton
+                      size="small"
+                      onClick={() => handleRemoveFromCart(item.productId)}
+                      sx={{ color: '#8a8a93', '&:hover': { color: '#ff4757' } }}
+                    >
+                      <DeleteIcon sx={{ fontSize: 16 }} />
+                    </IconButton>
+                  </Box>
+                </Box>
+              ))
+            ) : (
+              activeTable.kot.length === 0 && (
+                <Box sx={{ textAlign: 'center', py: 6, color: '#8a8a93' }}>
+                  <CartIcon sx={{ fontSize: 40, mb: 1.5, opacity: 0.2 }} />
+                  <Typography variant="body2">No items in cart.</Typography>
+                </Box>
+              )
+            )}
+          </Box>
+
+          {/* Billing calculations & Action Drawer */}
+          <Box sx={{ p: 2.5, bgcolor: '#1a1a1e', borderTop: '1px solid #2a2a30' }}>
+            
+            {/* Tax & Discount Inputs */}
+            <Box sx={{ display: 'flex', gap: 1.5, mb: 2 }}>
+              <TextField
+                label="Discount (%)"
+                size="small"
+                type="number"
+                value={discountValue}
+                onChange={(e) => setDiscountValue(Math.max(0, Number(e.target.value)))}
+                InputProps={{
+                  sx: { color: '#fff', bgcolor: '#121214', border: '1px solid #2a2a30' }
+                }}
+                InputLabelProps={{ sx: { color: '#8a8a93' } }}
+                sx={{ flexGrow: 1 }}
+              />
+
+              <FormControl size="small" sx={{ width: 100 }}>
+                <InputLabel sx={{ color: '#8a8a93' }}>GST (%)</InputLabel>
+                <Select
+                  value={taxRate}
+                  onChange={(e) => setTaxRate(Number(e.target.value))}
+                  label="GST (%)"
+                  sx={{ color: '#fff', bgcolor: '#121214', border: '1px solid #2a2a30' }}
+                >
+                  <MenuItem value={0}>0%</MenuItem>
+                  <MenuItem value={5}>5%</MenuItem>
+                  <MenuItem value={12}>12%</MenuItem>
+                  <MenuItem value={18}>18%</MenuItem>
+                </Select>
+              </FormControl>
+            </Box>
+
+            {/* Calculations Breakdown */}
+            <Stack spacing={1.2} sx={{ mb: 2.5 }}>
+              <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                <Typography sx={{ color: '#8a8a93', fontSize: '0.85rem' }}>Subtotal</Typography>
+                <Typography sx={{ color: '#fff', fontSize: '0.85rem', fontWeight: 'bold' }}>₹{calculations.subtotal}</Typography>
+              </Box>
+              
+              {calculations.discountAmount > 0 && (
+                <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <Typography sx={{ color: '#ff4757', fontSize: '0.85rem' }}>Discount</Typography>
+                  <Typography sx={{ color: '#ff4757', fontSize: '0.85rem', fontWeight: 'bold' }}>-₹{calculations.discountAmount}</Typography>
+                </Box>
+              )}
+              
+              <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                <Typography sx={{ color: '#8a8a93', fontSize: '0.85rem' }}>CGST / SGST ({taxRate}%)</Typography>
+                <Typography sx={{ color: '#fff', fontSize: '0.85rem', fontWeight: 'bold' }}>₹{calculations.taxAmount.toFixed(1)}</Typography>
+              </Box>
+
+              <Divider sx={{ borderColor: '#2a2a30', my: '0.5px !important' }} />
+
+              <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                <Typography sx={{ fontWeight: 800, color: '#fff', fontSize: '1.05rem' }}>Grand Total</Typography>
+                <Typography sx={{ fontWeight: 900, color: '#ff4757', fontSize: '1.15rem' }}>₹{calculations.grandTotal.toFixed(0)}</Typography>
+              </Box>
+            </Stack>
+
+            {/* Payment Mode Selector & UPI QR Code details */}
+            <Box sx={{ mb: 2.5 }}>
+              <Typography variant="caption" sx={{ color: '#8a8a93', fontWeight: 800, mb: 1, display: 'block' }}>
+                Payment Method
+              </Typography>
+              
+              <Stack direction="row" spacing={1}>
+                {['UPI', 'Cash', 'Card'].map((mode) => {
+                  const isSel = mode === paymentMode;
+                  return (
+                    <Button
+                      key={mode}
+                      onClick={() => setPaymentMode(mode)}
+                      fullWidth
+                      size="small"
+                      sx={{
+                        bgcolor: isSel ? 'rgba(255, 71, 87, 0.12)' : 'transparent',
+                        color: isSel ? '#ff4757' : '#8a8a93',
+                        border: '1px solid',
+                        borderColor: isSel ? '#ff4757' : '#2a2a30',
+                        fontWeight: 'bold',
+                        textTransform: 'none',
+                        '&:hover': { bgcolor: isSel ? 'rgba(255, 71, 87, 0.2)' : 'rgba(255,255,255,0.03)' }
+                      }}
+                      startIcon={mode === 'Cash' ? <CashIcon /> : mode === 'Card' ? <CardIconPay /> : <QrCodeIcon />}
+                    >
+                      {mode}
+                    </Button>
+                  );
+                })}
+              </Stack>
+            </Box>
+
+            {/* Final Submission Drawer Buttons */}
+            <Grid container spacing={2}>
+              <Grid size={{ xs: 6 }}>
+                <Button
+                  fullWidth
+                  variant="outlined"
+                  onClick={handleSendToKitchen}
+                  disabled={activeTable.cart.length === 0}
+                  sx={{
+                    borderColor: 'rgba(255, 165, 2, 0.4)',
+                    color: '#ffa502',
+                    fontWeight: 'bold',
+                    textTransform: 'none',
+                    py: 1,
+                    '&:hover': {
+                      borderColor: '#ffa502',
+                      bgcolor: 'rgba(255, 165, 2, 0.05)'
+                    }
+                  }}
+                  startIcon={<SendIcon />}
+                >
+                  Send KOT
+                </Button>
+              </Grid>
+
+              <Grid size={{ xs: 6 }}>
+                <Button
+                  fullWidth
+                  variant="contained"
+                  onClick={handleGenerateBill}
+                  disabled={isSubmitting || calculations.allItems.length === 0}
+                  sx={{
+                    bgcolor: '#ff4757',
+                    color: '#fff',
+                    fontWeight: 900,
+                    textTransform: 'none',
+                    py: 1,
+                    '&:hover': { bgcolor: '#ff6b81' }
+                  }}
+                  startIcon={isSubmitting ? <CircularProgress size={16} color="inherit" /> : <PrintIcon />}
+                >
+                  Bill & Print
+                </Button>
+              </Grid>
+
+              <Grid size={{ xs: 12 }}>
+                <Button
+                  fullWidth
+                  variant="text"
+                  color="inherit"
+                  size="small"
+                  onClick={handleCancelOrder}
+                  disabled={calculations.allItems.length === 0}
+                  sx={{ color: '#8a8a93', mt: 0.5, fontSize: '0.75rem', fontWeight: 'bold' }}
+                >
+                  Cancel Order
+                </Button>
+              </Grid>
+            </Grid>
+          </Box>
+        </Box>
+      </Box>
+
+      {/* 3. High-Fidelity Thermal Receipt Dialogue */}
+      <Dialog
+        open={billReceiptOpen}
+        onClose={() => setBillReceiptOpen(false)}
+        maxWidth="xs"
+        fullWidth
+        PaperProps={{
+          sx: {
+            borderRadius: 4,
+            overflow: 'hidden',
+            bgcolor: '#ffffff',
+            color: '#000000'
+          }
+        }}
+      >
+        <DialogTitle sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px dashed #dcdde1', pb: 2 }}>
+          <Typography variant="h6" fontWeight="bold">Thermal Receipt Preview</Typography>
+          <IconButton onClick={() => setBillReceiptOpen(false)} size="small"><CloseIcon /></IconButton>
+        </DialogTitle>
+
+        <DialogContent sx={{ p: 3, maxHeight: '550px', overflowY: 'auto' }}>
+          {generatedBillData && (
+            <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+              
+              {/* Actual Professional Thermal Template Component */}
+              <RealRestaurantThermal 
+                saleData={generatedBillData.saleData} 
+                size="80mm" 
+              />
+
+              {paymentMode === 'UPI' && (
+                <Box sx={{ 
+                  mt: 3, 
+                  p: 2.5, 
+                  border: '1px solid #dcdde1', 
+                  borderRadius: 3, 
+                  textAlign: 'center', 
+                  width: '100%', 
+                  bgcolor: '#f5f6fa',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center'
+                }}>
+                  <QrCodeIcon sx={{ fontSize: 130, color: '#2f3542' }} />
+                  <Typography variant="body2" fontWeight="bold" sx={{ mt: 1, color: '#2f3542' }}>
+                    UPI Scan Code - ACME Restaurant
+                  </Typography>
+                  <Typography variant="caption" color="textSecondary">
+                    Scan to pay ₹{calculations.grandTotal.toFixed(0)} directly
+                  </Typography>
+                </Box>
+              )}
+            </Box>
+          )}
+        </DialogContent>
+
+        <DialogActions sx={{ p: 2, borderTop: '1px dashed #dcdde1', justifyContent: 'space-between' }}>
+          <Button variant="outlined" onClick={() => setBillReceiptOpen(false)} sx={{ textTransform: 'none' }}>Close</Button>
+          <Button 
+            variant="contained" 
+            color="primary"
+            startIcon={<PrintIcon />}
+            onClick={() => {
+              window.print();
+            }}
+            sx={{ textTransform: 'none', px: 3 }}
+          >
+            Print Receipt
+          </Button>
+        </DialogActions>
+      </Dialog>
+    </Box>
+  );
+};

@@ -1,0 +1,723 @@
+{
+  "info": {
+    "name": "BillSoft — HDFC SmartGateway Payments",
+    "_postman_id": "billsoft-hdfc-payments-v2",
+    "description": "Complete HDFC SmartGateway (Juspay) payment flow for BillSoft SaaS.\n\nAuthor: Mahesh Lakhe | AGBTechnologies LLP | 15 April 2026\n\n▶ HOW TO USE:\n1. Import this collection AND the BillSoft_HDFC.postman_environment.json\n2. Select the 'BillSoft HDFC - Local' environment from the top-right dropdown\n3. Run requests in order: Auth → Create Session → Verify\n4. The JWT token is auto-captured after login\n5. The order_id is auto-captured after session creation",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [],
+  "item": [
+    {
+      "name": "🔐 0. Auth",
+      "description": "Authentication — run this FIRST to get your JWT token. Token is auto-saved to environment.",
+      "item": [
+        {
+          "name": "0.1 Health Check",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/health",
+              "host": ["{{base_url}}"],
+              "path": ["api", "health"]
+            },
+            "description": "Quick check that the BillSoft backend is running."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Server is running', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "    const json = pm.response.json();",
+                  "    pm.expect(json.status).to.eql('OK');",
+                  "    console.log('✅ Server Health:', json.message);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "0.2 Login (Auto-saves JWT Token)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"email\": \"{{user_email}}\",\n    \"password\": \"{{user_password}}\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/auth/login",
+              "host": ["{{base_url}}"],
+              "path": ["api", "auth", "login"]
+            },
+            "description": "Login to get JWT token. Token is automatically saved to the environment variable 'auth_token' and used in all subsequent requests."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Login successful', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "    const json = pm.response.json();",
+                  "    pm.expect(json.token).to.be.a('string');",
+                  "",
+                  "    // Auto-save token to environment",
+                  "    pm.environment.set('auth_token', json.token);",
+                  "    console.log('✅ JWT Token saved to environment');",
+                  "    console.log('👤 User:', json.user?.email || json.email);",
+                  "    console.log('📋 Plan:', json.user?.planType);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "0.3 Get My Profile",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{auth_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/auth/profile",
+              "host": ["{{base_url}}"],
+              "path": ["api", "auth", "profile"]
+            },
+            "description": "Get current user profile. Use this to confirm your plan type and user ID."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Profile fetched successfully', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "    const json = pm.response.json();",
+                  "    console.log('👤 User ID:', json.user?.id);",
+                  "    console.log('📧 Email:', json.user?.email);",
+                  "    console.log('💼 Plan:', json.user?.planType);",
+                  "    console.log('📅 Plan Expires:', json.user?.planExpiresAt);",
+                  "    // Save user ID for reference",
+                  "    pm.environment.set('user_id', json.user?.id);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "💳 1. Create Payment Session",
+      "description": "HDFC SmartGateway — Step 1: Create an order session. This returns sdk_payload and payment_links.",
+      "item": [
+        {
+          "name": "1.1 Create Session — STARTER Plan (₹399)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{auth_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"plan\": \"STARTER\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/payments/create-subscription-session",
+              "host": ["{{base_url}}"],
+              "path": ["api", "payments", "create-subscription-session"]
+            },
+            "description": "Creates a payment session for STARTER plan (₹399/month, 30 days).\n\nThe order_id is automatically saved to the environment after this call."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Session created successfully', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "    const json = pm.response.json();",
+                  "    pm.expect(json.success).to.be.true;",
+                  "    pm.expect(json.order_id).to.be.a('string');",
+                  "    pm.expect(json.payment_links).to.have.property('web');",
+                  "",
+                  "    // Auto-save order_id for verification step",
+                  "    pm.environment.set('order_id', json.order_id);",
+                  "    pm.environment.set('payment_web_url', json.payment_links?.web);",
+                  "",
+                  "    console.log('✅ Order ID:', json.order_id);",
+                  "    console.log('🌐 Payment URL:', json.payment_links?.web);",
+                  "    console.log('');",
+                  "    console.log('📋 NEXT STEP: Copy the Payment URL above → Open in browser → Complete payment');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "1.2 Create Session — GROWTH Plan (₹999)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{auth_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"plan\": \"GROWTH\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/payments/create-subscription-session",
+              "host": ["{{base_url}}"],
+              "path": ["api", "payments", "create-subscription-session"]
+            },
+            "description": "Creates a payment session for GROWTH plan (₹999/month, 30 days).\n\nMost popular plan — recommended for testing."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('GROWTH session created', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "    const json = pm.response.json();",
+                  "    pm.expect(json.success).to.be.true;",
+                  "",
+                  "    pm.environment.set('order_id', json.order_id);",
+                  "    pm.environment.set('payment_web_url', json.payment_links?.web);",
+                  "",
+                  "    console.log('✅ Order ID saved:', json.order_id);",
+                  "    console.log('🌐 Open in browser:', json.payment_links?.web);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "1.3 Create Session — PRO Plan (₹2,499)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{auth_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"plan\": \"PRO\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/payments/create-subscription-session",
+              "host": ["{{base_url}}"],
+              "path": ["api", "payments", "create-subscription-session"]
+            },
+            "description": "Creates a payment session for PRO plan (₹2,499/month, 365 days)."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('PRO session created', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "    const json = pm.response.json();",
+                  "    pm.expect(json.success).to.be.true;",
+                  "",
+                  "    pm.environment.set('order_id', json.order_id);",
+                  "    pm.environment.set('payment_web_url', json.payment_links?.web);",
+                  "",
+                  "    console.log('✅ PRO Order ID:', json.order_id);",
+                  "    console.log('🌐 Payment URL:', json.payment_links?.web);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "1.4 ❌ Create Session — No Auth (Expect 401)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"plan\": \"GROWTH\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/payments/create-subscription-session",
+              "host": ["{{base_url}}"],
+              "path": ["api", "payments", "create-subscription-session"]
+            },
+            "description": "Negative test: Send request WITHOUT Authorization header. Should return 401 Unauthorized."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Returns 401 without auth', function () {",
+                  "    pm.response.to.have.status(401);",
+                  "    console.log('✅ Correctly rejected unauthenticated request');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "1.5 ❌ Create Session — Invalid Plan (Expect 400)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{auth_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"plan\": \"INVALID_PLAN\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/payments/create-subscription-session",
+              "host": ["{{base_url}}"],
+              "path": ["api", "payments", "create-subscription-session"]
+            },
+            "description": "Negative test: Send an invalid plan name. Should return 400 with error message."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Returns 400 for invalid plan', function () {",
+                  "    pm.response.to.have.status(400);",
+                  "    const json = pm.response.json();",
+                  "    pm.expect(json.message).to.include('Invalid plan');",
+                  "    console.log('✅ Correctly rejected invalid plan:', json.message);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "✅ 2. Verify Payment Status",
+      "description": "HDFC SmartGateway — Step 3 (after browser payment): Verify the order status and activate the plan.",
+      "item": [
+        {
+          "name": "2.1 Verify Order (uses saved order_id)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/payments/verify/{{order_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "payments", "verify", "{{order_id}}"]
+            },
+            "description": "Verifies payment status using the order_id auto-saved from session creation.\n\nOn CHARGED status: activates user plan in database.\nNo authentication required."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Verification response received', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "    const json = pm.response.json();",
+                  "",
+                  "    console.log('📊 Verification Result:');",
+                  "    console.log('   Success:', json.success);",
+                  "    console.log('   Status:', json.status);",
+                  "    console.log('   Plan:', json.plan || 'N/A');",
+                  "    console.log('   Type:', json.type || 'N/A');",
+                  "",
+                  "    if (json.success && json.status === 'PAID') {",
+                  "        console.log('🎉 PAYMENT VERIFIED! Plan activated:', json.plan);",
+                  "        pm.environment.set('last_verified_plan', json.plan);",
+                  "    } else {",
+                  "        console.log('⏳ Payment not yet complete. Status:', json.status);",
+                  "    }",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "2.2 Verify Order (manual order_id)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/payments/verify/SUB-GROWTH-REPLACE_USER_ID-REPLACE_TIMESTAMP",
+              "host": ["{{base_url}}"],
+              "path": ["api", "payments", "verify", "SUB-GROWTH-REPLACE_USER_ID-REPLACE_TIMESTAMP"]
+            },
+            "description": "Manually enter a specific order_id for verification.\n\nOrder ID format: SUB-{PLAN}-{userId}-{timestamp}\nExample: SUB-GROWTH-clxxxx1234-1713168000000"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Manual verification response', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "    const json = pm.response.json();",
+                  "    console.log('📊 Status:', json.status);",
+                  "    console.log('✅ Success:', json.success);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "2.3 ❌ Verify Invalid Order",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/payments/verify/INVALID-ORDER-999",
+              "host": ["{{base_url}}"],
+              "path": ["api", "payments", "verify", "INVALID-ORDER-999"]
+            },
+            "description": "Negative test: Verify a non-existent order. Should return success:false."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Invalid order returns graceful response', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "    const json = pm.response.json();",
+                  "    pm.expect(json.success).to.be.false;",
+                  "    console.log('✅ Correctly returned failure for invalid order');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "🔁 3. Callback Handler (Simulate HDFC)",
+      "description": "Simulate HDFC SmartGateway callback POST to backend. In real flow, HDFC calls this automatically.",
+      "item": [
+        {
+          "name": "3.1 Simulate Callback — SUCCESS",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/x-www-form-urlencoded"
+              }
+            ],
+            "body": {
+              "mode": "urlencoded",
+              "urlencoded": [
+                {
+                  "key": "order_id",
+                  "value": "{{order_id}}",
+                  "description": "Order ID from session creation"
+                },
+                {
+                  "key": "status",
+                  "value": "CHARGED"
+                },
+                {
+                  "key": "status_id",
+                  "value": "21"
+                },
+                {
+                  "key": "merchant_id",
+                  "value": "SG4887"
+                },
+                {
+                  "key": "amount",
+                  "value": "999.0"
+                },
+                {
+                  "key": "currency",
+                  "value": "INR"
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{base_url}}/api/payments/handle-response",
+              "host": ["{{base_url}}"],
+              "path": ["api", "payments", "handle-response"]
+            },
+            "description": "Simulates HDFC sending a successful payment callback.\n\nExpected: 302 redirect to frontend /payment-response?order_id=..."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Callback handled (redirect returned)', function () {",
+                  "    // HDFC callback triggers a redirect — expect 302 or 200",
+                  "    pm.expect([200, 302]).to.include(pm.response.code);",
+                  "    console.log('✅ Callback response code:', pm.response.code);",
+                  "    const location = pm.response.headers.get('Location');",
+                  "    if (location) {",
+                  "        console.log('🔀 Redirecting to:', location);",
+                  "    }",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "3.2 Simulate Callback — FAILED",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/x-www-form-urlencoded"
+              }
+            ],
+            "body": {
+              "mode": "urlencoded",
+              "urlencoded": [
+                {
+                  "key": "order_id",
+                  "value": "{{order_id}}"
+                },
+                {
+                  "key": "status",
+                  "value": "AUTHENTICATION_FAILED"
+                },
+                {
+                  "key": "merchant_id",
+                  "value": "SG4887"
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{base_url}}/api/payments/handle-response",
+              "host": ["{{base_url}}"],
+              "path": ["api", "payments", "handle-response"]
+            },
+            "description": "Simulates HDFC sending a failed payment callback.\n\nExpected: 302 redirect to /payment-response?status=failed&reason=AUTHENTICATION_FAILED"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Failed callback handled', function () {",
+                  "    pm.expect([200, 302]).to.include(pm.response.code);",
+                  "    const location = pm.response.headers.get('Location');",
+                  "    if (location) {",
+                  "        pm.expect(location).to.include('status=failed');",
+                  "        console.log('✅ Correctly redirected to failure page:', location);",
+                  "    }",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "3.3 Simulate Callback — GET (alternate)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/payments/handle-response?order_id={{order_id}}&status=CHARGED",
+              "host": ["{{base_url}}"],
+              "path": ["api", "payments", "handle-response"],
+              "query": [
+                {
+                  "key": "order_id",
+                  "value": "{{order_id}}"
+                },
+                {
+                  "key": "status",
+                  "value": "CHARGED"
+                }
+              ]
+            },
+            "description": "Tests the GET callback handler. Some gateways redirect with GET params instead of POST."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "🛠️ 4. System Utilities",
+      "description": "Helper endpoints for diagnostics and debugging.",
+      "item": [
+        {
+          "name": "4.1 Payments Router Health",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/payments/test",
+              "host": ["{{base_url}}"],
+              "path": ["api", "payments", "test"]
+            },
+            "description": "Confirms the payment router is active and reachable."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Payments router active', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "    const json = pm.response.json();",
+                  "    pm.expect(json.message).to.include('active');",
+                  "    console.log('✅', json.message);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "4.2 System Test Connection",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/system/test-connection",
+              "host": ["{{base_url}}"],
+              "path": ["api", "system", "test-connection"]
+            },
+            "description": "Full server connectivity test — returns server time, client IP, and local IP."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Server connection successful', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "    const json = pm.response.json();",
+                  "    console.log('🌐 Server Time:', json.serverTime);",
+                  "    console.log('📡 Server IP:', json.localIp);",
+                  "    console.log('🖥️ Client IP:', json.clientIp);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "4.3 Show Saved Payment URL",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/payments/test",
+              "host": ["{{base_url}}"],
+              "path": ["api", "payments", "test"]
+            },
+            "description": "Dummy request — check the Postman Console to see the saved payment_web_url."
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "const orderId = pm.environment.get('order_id');",
+                  "const paymentUrl = pm.environment.get('payment_web_url');",
+                  "console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');",
+                  "console.log('📋 Saved Environment Variables:');",
+                  "console.log('   order_id:', orderId || '(not set)');",
+                  "console.log('   payment_web_url:', paymentUrl || '(not set)');",
+                  "console.log('   auth_token:', pm.environment.get('auth_token') ? 'SET ✅' : 'NOT SET ❌');",
+                  "console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "response": []
+        }
+      ]
+    }
+  ]
+}

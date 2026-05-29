@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Thermal Receipt</title>
+    <style>
+        body {
+            font-family: 'Courier New', Courier, monospace;
+            width: 300px;
+            margin: 0;
+            padding: 10px;
+            font-size: 12px;
+            color: #000;
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 10px;
+        }
+        .business-name {
+            font-size: 16px;
+            font-weight: bold;
+            text-transform: uppercase;
+        }
+        .divider {
+            border-top: 1px dashed #000;
+            margin: 5px 0;
+        }
+        .info-row {
+            display: flex;
+            justify-content: space-between;
+            margin: 2px 0;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 5px 0;
+        }
+        th {
+            text-align: left;
+            border-bottom: 1px solid #000;
+            padding-bottom: 2px;
+        }
+        .qty { text-align: center; }
+        .amount { text-align: right; }
+        .total-section {
+            margin-top: 5px;
+            font-weight: bold;
+        }
+        .footer {
+            text-align: center;
+            margin-top: 15px;
+            font-size: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div class="business-name"><%= business.name %></div>
+        <div><%= business.address %></div>
+        <div>Contact: <%= business.phone %></div>
+        <div>GSTIN: <%= business.gst %></div>
+    </div>
+
+    <div class="divider"></div>
+    
+    <div class="info-row">
+        <span>Receipt: <%= bill.number %></span>
+        <span><%= bill.date %></span>
+    </div>
+    <div class="info-row">
+        <span>Cust: <%= bill.customerName %></span>
+    </div>
+
+    <div class="divider"></div>
+
+    <table>
+        <thead>
+            <tr>
+                <th>Item</th>
+                <th class="qty">Qty</th>
+                <th class="amount">Amt</th>
+            </tr>
+        </thead>
+        <tbody>
+            <% bill.items.forEach((item) => { %>
+                <tr>
+                    <td><%= item.name.substring(0, 15) %></td>
+                    <td class="qty"><%= item.qty %></td>
+                    <td class="amount"><%= item.total.toFixed(2) %></td>
+                </tr>
+            <% }); %>
+        </tbody>
+    </table>
+
+    <div class="divider"></div>
+
+    <div class="total-section">
+        <div class="info-row" style="font-size: 14px;">
+            <span>TOTAL:</span>
+            <span>₹<%= bill.totalAmount.toFixed(2) %></span>
+        </div>
+    </div>
+
+    <div class="divider"></div>
+    
+    <div class="footer">
+        <div>THANK YOU FOR VISITING!</div>
+        <div>T&C Apply. Have a Nice Day.</div>
+        <div style="margin-top: 5px;"><%= bill.paymentMode %> - <%= bill.paymentStatus %></div>
+    </div>
+</body>
+</html>
